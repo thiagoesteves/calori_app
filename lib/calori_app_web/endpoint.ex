@@ -50,5 +50,6 @@ defmodule CaloriAppWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+  plug Pow.Plug.Session, otp_app: :calori_app
   plug CaloriAppWeb.Router
 end
