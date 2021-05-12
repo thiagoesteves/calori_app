@@ -1,5 +1,14 @@
 use Mix.Config
 
+# Configuration added to work with phoenix
+config :phoenix_distillery, PhoenixDistillery.Endpoint,
+  http: [port: {:system, "PORT"}],
+  url: [host: "localhost", port: {:system, "PORT"}], # This is critical for ensuring web-sockets properly authorize.
+  cache_static_manifest: "priv/static/manifest.json",
+  server: true,
+  root: ".",
+  version: Mix.Project.config[:version]
+
 # For production, don't forget to configure the url host
 # to something meaningful, Phoenix uses this information
 # when generating URLs.
