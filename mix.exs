@@ -46,7 +46,10 @@ defmodule CaloriApp.MixProject do
       {:jason, "~> 1.0"},
       {:plug_cowboy, "~> 2.0"},
       {:pow, "~> 1.0"},
-      {:distillery, "~> 2.1"}
+      {:distillery, "~> 2.1"},
+
+      # For test only
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
     ]
   end
 
