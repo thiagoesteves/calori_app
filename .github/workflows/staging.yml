@@ -1,34 +1,20 @@
-name: Elixir CI
+name: Elixir Staging
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - 'main'
   pull_request:
-    branches: [ main ]
+    branches:
+      - 'main'
 
 jobs:
   build:
-    name: Build and test
+    name: Staging environment and deployment
     runs-on: ubuntu-latest
     env:
-      MIX_ENV: test
       SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    services:
-      postgres:
-        image: postgres:12-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: calori_app_test
-        ports:
-          - "5432:5432"
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
     - uses: actions/checkout@v2
       with:
@@ -47,16 +33,6 @@ jobs:
         path: deps
         key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
-    - name: Install dependencies
-      run: |
-        mix deps.get
-        mix compile
-    - name: Run mix format
-      run: mix format --check-formatted
-    - name: Run tests
-      run: mix test
-    #- name: Run dialyzer
-    #  run: mix dialyzer --halt-exit-status
     - name: Release current deployed package - Return one commit and execute a release
       run: |
         git checkout HEAD~1 --quiet
@@ -68,4 +44,14 @@ jobs:
         git checkout main
         git log --pretty=oneline -1
         make upgrade
+
+    - name: Upload release files to S3
+      uses: qoqa/action-s3-cp@v1.1
+      env:
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'sa-east-1'
+        AWS_S3_PATH: '/'
+        FILE: '_build/prod/rel/calori_app/releases/0.2.0/calori_app.tar.gz'
 

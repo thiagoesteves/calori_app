@@ -1,3 +1,6 @@
+![github workflow](https://github.com/thiagoesteves/calori_app/workflows/Elixir%20Staging/badge.svg)
+![github workflow](https://github.com/thiagoesteves/calori_app/workflows/Elixir%20Develop/badge.svg)
+
 # CaloriApp
 
 The current local deploy using docker:

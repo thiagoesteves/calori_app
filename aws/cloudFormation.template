@@ -56,7 +56,7 @@
     "DbHost": {
       "Description": "Database host (localhost or db)",
       "Type": "String",
-      "Default": "db"
+      "Default": "localhost"
     },
 
     "DbName": {
