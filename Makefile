@@ -11,6 +11,12 @@ start:
 #    Application Commands - Release, Compile, etc        #
 ##########################################################
 
+setup_env:
+#	Prepare Database
+	mix ecto.setup
+#	Install / update  JavaScript dependencies
+	npm install --prefix ./assets
+
 clean:
 	mix deps.clean --all
 
