@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MIX_ENV: test
+      SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     services:
       postgres:
         image: postgres:12-alpine
@@ -29,6 +31,11 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '14'
     - name: Set up Elixir
       uses: erlef/setup-elixir@885971a72ed1f9240973bd92ab57af8c1aa68f24
       with:
@@ -48,14 +55,17 @@ jobs:
       run: mix format --check-formatted
     - name: Run tests
       run: mix test
-    - name: Run git commands
+    #- name: Run dialyzer
+    #  run: mix dialyzer --halt-exit-status
+    - name: Release current deployed package - Return one commit and execute a release
       run: |
-        # Change to the previous commit
-        git checkout HEAD~1
-        git log --name-status HEAD^..HEAD
-        # Change back to the latest commit
+        git checkout HEAD~1 --quiet
+        git log --pretty=oneline -1
+        make release
+
+    - name: Release upgrade package - Go to the latest commit and generate an upgrade
+      run: |
         git checkout main
-        git log --name-status HEAD^..HEAD
-    - name: Run dialyzer
-      run: mix dialyzer --halt-exit-status
+        git log --pretty=oneline -1
+        make upgrade
 

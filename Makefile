@@ -44,7 +44,7 @@ release: clean compile
 	MIX_ENV=${MIX_ENV} mix do phx.digest, distillery.release --env=${MIX_ENV}
 	@echo "Release for MIX_ENV=${MIX_ENV} is done !"
 
-upgrade:
+upgrade: compile
 # 	Compile assets
 	npm run deploy --prefix assets
 
