@@ -37,21 +37,37 @@ jobs:
       run: |
         git checkout HEAD~1 --quiet
         git log --pretty=oneline -1
+        echo "CURRENT_VERSION=$(grep -Eo 'version: "[0-9].*' mix.exs | sed 's/[version: \",|[:space:]]//g')" >> $GITHUB_ENV
         make release
 
     - name: Release upgrade package - Go to the latest commit and generate an upgrade
       run: |
         git checkout main
         git log --pretty=oneline -1
+        echo "UPGRADE_VERSION=$(grep -Eo 'version: "[0-9].*' mix.exs | sed 's/[version: \",|[:space:]]//g')" >> $GITHUB_ENV
         make upgrade
 
-    - name: Upload release files to S3
+    - name: Check the version was updated
+      if: env.CURRENT_VERSION == env.UPGRADE_VERSION
+      run: exit 1
+        
+    - name: Upload current package
       uses: qoqa/action-s3-cp@v1.1
       env:
         AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'sa-east-1'
-        AWS_S3_PATH: '/'
-        FILE: '_build/prod/rel/calori_app/releases/0.2.0/calori_app.tar.gz'
+        AWS_S3_PATH: '/releases/${{ env.CURRENT_VERSION }}/'
+        FILE: '_build/prod/rel/calori_app/releases/${{ env.CURRENT_VERSION }}/calori_app.tar.gz'
+
+    - name: Upload upgrade package
+      uses: qoqa/action-s3-cp@v1.1
+      env:
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'sa-east-1'
+        AWS_S3_PATH: '/upgrades/${{ env.UPGRADE_VERSION }}/'
+        FILE: '_build/prod/rel/calori_app/releases/${{ env.UPGRADE_VERSION }}/calori_app.tar.gz'
 
