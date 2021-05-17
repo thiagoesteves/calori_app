@@ -1,7 +1,10 @@
 ![github workflow](https://github.com/thiagoesteves/calori_app/workflows/Elixir%20Staging/badge.svg)
 ![github workflow](https://github.com/thiagoesteves/calori_app/workflows/Elixir%20Develop/badge.svg)
+![ubuntu-20.04](https://actionvirtualenvironmentsstatus.azurewebsites.net/api/status?imageName=ubuntu20&badge=1)
 
-# CaloriApp
+# Welcome to the source code webpage of Calori Software Ltda
+
+Welcome! you are now invited to have a look and check the source code for Calori Software Webpage. Here we are sharing our development environment as well as the deployment environment. The webpage is using CloudFormation + Ec2 + S3 + Github Actions + Elixir + Phoenix + Ecto and hot upgrades with distillery. All is configured to serve automatically the EC2 instance that is running in AWS. You can achieve the same environment with just a few clicks and you are ready to push a change in github and see these changes being applied automatically on your website.
 
 The current local deploy using docker:
 

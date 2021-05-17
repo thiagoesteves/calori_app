@@ -19,10 +19,10 @@
     </ul>
   </article>
   <article class="column">
-    <h2>My Webpages</h2>
+    <h2>My Game Webpages</h2>
     <ul>
       <li>
-        <a href="http://www.calori.com.br">Erlgame</a>
+        <a href="http://www.calori.com.br">Snake Game in Erlang</a>
       </li>
     </ul>
   </article>

@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "AWS Calori App",
+  "Description" : "AWS Calori Website App",
 
   "Parameters" : {
 
@@ -59,16 +59,50 @@
       "Default": "calori_app"
     },
 
-    "DatabaseUser": {
-      "Description": "Database user name",
+    "DatabaseName": {
+      "Default": "caloriappdb",
+      "Description" : "The database name",
       "Type": "String",
-      "Default": "postgres"
+      "MinLength": "1",
+      "MaxLength": "20",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+
+    "DatabaseUser": {
+      "Default": "postgres",
+      "NoEcho": "true",
+      "Description" : "The database admin account username",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "16",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
     },
 
     "DatabasePass": {
-      "Description": "Database password",
+      "Default": "postgres",
+      "NoEcho": "true",
+      "Description" : "The database admin account password",
       "Type": "String",
-      "Default": "postgres"
+      "MinLength": "8"
+    },
+
+    "DatabaseClass" : {
+      "Default" : "db.t2.micro",
+      "Description" : "Database instance class",
+      "Type" : "String",
+      "AllowedValues" : [ "db.t2.micro", "db.m1.small", "db.m1.large", "db.m1.xlarge", "db.m2.xlarge" ],
+      "ConstraintDescription" : "must select a valid database instance type."
+    },
+
+    "DatabaseAllocatedStorage" : {
+      "Default": "20",
+      "Description" : "The size of the database (Gb)",
+      "Type": "Number",
+      "MinValue": "20",
+      "MaxValue": "13384",
+      "ConstraintDescription" : "must be above 20+"
     },
 
     "PhoenixPort": {
@@ -77,12 +111,32 @@
       "Default": "4000"
     },
 
-    "OtpVersion": {
-      "Description": "Define the Erlang OTP version to be installed",
+    "ShouldCreateBucketInputParameter": {
       "Type": "String",
-      "Default": "20.3"
-    }
+      "Default" : "true",
+      "AllowedValues": [
+        "true",
+        "false"
+      ],
+      "Description": "If true then the S3 bucket will be created with the CloudFormation stack."
+    },
 
+    "UpgradeRequestTime": {
+      "Description": "Time between requests for deploy and upgrade in seconds",
+      "Type": "Number",
+      "Default": "30"
+    }
+  },
+
+  "Conditions": {
+    "CreateS3Bucket": {
+      "Fn::Equals": [
+        {
+          "Ref": "ShouldCreateBucketInputParameter"
+        },
+        "true"
+      ]
+    }
   },
 
   "Resources" : {
@@ -94,17 +148,7 @@
           "config" : {
             "packages" : {
               "apt" : {
-                "make"              : [],
                 "nginx"             : [],
-                "m4"                : [],
-                "libncurses5-dev"   : [],
-                "libncursesw5-dev"  : [],
-                "openjdk-8-jre"     : [],
-                "flex"              : [],
-                "fop"               : [],
-                "nodejs"            : [],
-                "inotify-tools"     : [],
-                "npm"               : [],
                 "postgresql-12"     : [],
                 "awscli"            : []
               }
@@ -114,27 +158,18 @@
                 "content" : { "Fn::Join" : [ "", [
                   "#!/bin/bash                                                                        \n",
                   "                                                                                   \n",
-                  "ELIXIR_APP_PATH=/home/ubuntu/deploy/                                               \n",
-                  "ERLANG_PACKAGES=https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb \n",
-                  "ERLANG_VERSION=", { "Ref": "OtpVersion" }, "                                       \n",
-                  "                                                                                   \n",
+                  "DEPLOY_PATH=/home/deploy                                                           \n",
+                  "DEPLOY_APP=${DEPLOY_PATH}/app                                                      \n",
+                  "DEPLOY_SCRIPTS=${DEPLOY_PATH}/scripts                                              \n",
                   "echo \"======== Modifying nginx configuration file \"                              \n",
                   "sudo sed -i '0,/try_files $uri $uri\\/ =404;/s//proxy_set_header   X-Forwarded-For $remote_addr; \\n                proxy_set_header   Host $http_host;\\n                proxy_pass         \\\"http:\\/\\/127.0.0.1:", { "Ref": "PhoenixPort" }, "\\\";/' /etc/nginx/sites-enabled/default \n",
                   "                                                                                   \n",
-                  "echo \"======== Installing Erlang/ELixir \"                                        \n",
-                  "wget ${ERLANG_PACKAGES}                                                            \n",
-                  "sudo dpkg -i erlang-solutions_2.0_all.deb                                          \n",
-                  "sudo apt-get update                                                                \n",
-                  "sudo apt-get install esl-erlang=1:${ERLANG_VERSION}.* -y                           \n",
-                  "sudo apt-get install -y elixir                                                     \n",
-                  "                                                                                   \n",
-                  "echo \"======== Creating Postgressql user/pass  \"                                 \n",
-                  "sudo su postgres <<EOF\n",
-                  "psql -c \"CREATE USER ", { "Ref": "DatabaseUser" }, ";\"\n",
-                  "EOF\n",
-                  "sudo su postgres <<EOF\n",
-                  "psql -c \"ALTER USER ", { "Ref": "DatabaseUser" }, " PASSWORD '", { "Ref": "DatabasePass" }, "'; ALTER USER ", { "Ref": "DatabaseUser" }, " WITH SUPERUSER;\"\n",
-                  "EOF\n",
+                  "echo \"======== Create a deploy user and its folders \"                            \n",
+                  "sudo adduser deploy --disabled-password --gecos \"deploy user - limited access\"   \n",
+                  "sudo mkdir ${DEPLOY_APP}                                                           \n",
+                  "sudo mkdir ${DEPLOY_SCRIPTS}                                                       \n",
+                  "sudo cp /home/ubuntu/upgrade.sh /home/ubuntu/deploy.sh ${DEPLOY_SCRIPTS}           \n",
+                  "sudo chown -R deploy:deploy  ${DEPLOY_PATH}/*                                      \n",
                   "                                                                                   \n",
                   "echo \"======== Configuring to Start automatically \"                              \n",
                   "sudo systemctl enable run-app                                                      \n",
@@ -147,7 +182,7 @@
                 "owner" : "root",
                 "group" : "root"
               },
-              "/home/ubuntu/deploy/upgrade.sh" : {
+              "/home/ubuntu/upgrade.sh" : {
                 "content" : { "Fn::Join" : [ "", [
                   "#!/bin/bash                                                            \n",
                   "UPGRADE_PATH=",{ "Ref": "CaloriAppS3Bucket" }, "/upgrades/             \n",
@@ -171,20 +206,21 @@
                   "    bin/${ELIXIR_APP_NAME} upgrade ${UPGRADE_VERSION}                  \n",
                   "  fi                                                                   \n",
                   "                                                                       \n",
-                  "  sleep 30                                                             \n",
+                  "  sleep ", { "Ref": "UpgradeRequestTime" }, "                          \n",
                   "done                                                                   \n"
                 ]]},
                 "mode"  : "000755",
                 "owner" : "root",
                 "group" : "root"
               },
-              "/home/ubuntu/deploy/deploy.sh" : {
+              "/home/ubuntu/deploy.sh" : {
                 "content" : { "Fn::Join" : [ "", [
                   "#!/bin/bash                                                            \n",
                   "RELEASE_PATH=",{ "Ref": "CaloriAppS3Bucket" }, "/releases/             \n",
                   "EC2_TMP=/tmp/releases                                                  \n",
                   "rx='^([0-9]+\\.){0,2}(\\*|[0-9]+)$'                                    \n",
-                  "ELIXIR_APP_NAME=", { "Ref": "ElixirAppName" }, "                       \n",
+                  "APP_NAME=", { "Ref": "ElixirAppName" }, "                              \n",
+                  "SCRIPTS_PATH=/home/deploy/scripts                                      \n",
                   "                                                                       \n",
                   "while :                                                                \n",
                   "do                                                                     \n",
@@ -195,17 +231,20 @@
                   "  DEPLOY_VERSION=$(find ${EC2_TMP} -type d -name '[0-9]*.[0-9]*.[0-9]*' -printf \"%f\\n\" | sort -V | tail -n 1)\n",
                   "  if [[ $DEPLOY_VERSION =~ $rx ]]; then                                \n",
                   "    echo \"Installing ${VERSION}\"                                     \n",
-                  "    cp ${EC2_TMP}/${DEPLOY_VERSION}/${ELIXIR_APP_NAME}.tar.gz .        \n",
-                  "    tar xvf ${ELIXIR_APP_NAME}.tar.gz                                  \n",
+                  "    cp ${EC2_TMP}/${DEPLOY_VERSION}/${APP_NAME}.tar.gz .               \n",
+                  "    tar xvf ${APP_NAME}.tar.gz                                         \n",
                   "    echo \"Creating and migrating the Database ...\"                   \n",
-                  "    bin/${ELIXIR_APP_NAME} eval \"CaloriApp.Release.create_and_migrate\"\n",
-                  "    echo \"Application ${ELIXIR_APP_NAME} installed with success, rebooting ...\"\n",
-                  "    sync && reboot &                                                   \n",
+                  "    bin/${APP_NAME} eval \"CaloriApp.Release.create_and_migrate\"      \n",
+                  "    echo \"starting ${APP_NAME}\"                                      \n",
+                  "    bin/${APP_NAME} start                                              \n",
+                  "    echo \"Starting daemon to upgrade automatically\"                  \n",
+                  "    ${SCRIPTS_PATH}/upgrade.sh </dev/null &>/dev/null &                \n",
+                  "    exit 0                                                             \n",
                   "  else                                                                 \n",
                   "    echo \"No releases available yet\"                                 \n",
                   "  fi                                                                   \n",
-                  "  sleep 30                                                             \n",
-                  "done                                                                   \n"
+                  "  sleep ", { "Ref": "UpgradeRequestTime" }, "                          \n",
+                  "done                                                                   \n"   
                 ]]},
                 "mode"  : "000755",
                 "owner" : "root",
@@ -223,41 +262,42 @@
                   "# Short-Description: Starts/Stops Elixir application      \n",
                   "### END INIT INFO                                         \n",
                   "                                                          \n",
-                  "export HOME=/home/ubuntu                                  \n",
+                  "export HOME=/home/deploy                                  \n",
                   "export LANG=\"en_US.utf8\"                                \n",
                   "export LANGUAGE=\"en_US:\"                                \n",
                   "export LC_ALL=en_US.UTF-8                                 \n",
                   "export TERM=screen                                        \n",
                   "                                                          \n",
-                  "ELIXIR_APP_PATH=/home/ubuntu/deploy/                      \n",
-                  "ELIXIR_APP_NAME=", { "Ref": "ElixirAppName" }, "          \n",
+                  "APP_PATH=/home/deploy/app                                 \n",
+                  "SCRIPTS_PATH=/home/deploy/scripts                         \n",
+                  "APP_NAME=", { "Ref": "ElixirAppName" }, "                 \n",
                   "                                                          \n",
                   "start() {                                                 \n",
-                  "    cd ${ELIXIR_APP_PATH}                                 \n",
-                  "    if [ -f \"bin/${ELIXIR_APP_NAME}\" ]; then            \n",
-                  "      echo \"starting ${ELIXIR_APP_NAME}\"                \n",
-                  "      bin/${ELIXIR_APP_NAME} start                        \n",
+                  "    cd ${APP_PATH}                                        \n",
+                  "    if [ -f \"bin/${APP_NAME}\" ]; then                   \n",
+                  "      echo \"starting ${APP_NAME}\"                       \n",
+                  "      sudo -u deploy bin/${APP_NAME} start                \n",
                   "      echo \"Starting daemon to upgrade automatically\"   \n",
-                  "      ./upgrade.sh </dev/null &>/dev/null &               \n",
+                  "      sudo -u deploy ${SCRIPTS_PATH}/upgrade.sh </dev/null &>/dev/null & \n",
                   "    else                                                  \n",
                   "      echo \"Starting daemon to deploy automatically\"    \n",
-                  "      ./deploy.sh </dev/null &>/dev/null &                \n",
+                  "      sudo -u deploy ${SCRIPTS_PATH}/deploy.sh </dev/null &>/dev/null & \n",
                   "    fi                                                    \n",
                   "}                                                         \n",
                   "                                                          \n",
                   "stop() {                                                  \n",
                   "    # stop erlang application                             \n",
-                  "    cd ${ELIXIR_APP_PATH}                                 \n",
-                  "    if [ -f \"bin/${ELIXIR_APP_NAME}\" ]; then            \n",
-                  "      bin/${ELIXIR_APP_NAME} stop                         \n",
+                  "    cd ${APP_PATH}                                        \n",
+                  "    if [ -f \"bin/${APP_NAME}\" ]; then                   \n",
+                  "      sudo -u deploy bin/${APP_NAME} stop                 \n",
                   "    else                                                  \n",
-                  "      echo \"${ELIXIR_APP_NAME} not installed\"           \n",
+                  "      echo \"${APP_NAME} not installed\"                  \n",
                   "    fi                                                    \n",
                   "}                                                         \n",
                   "                                                          \n",
                   "status() {                                                \n",
-                  "    cd ${ELIXIR_APP_PATH}                                 \n",
-                  "    bin/${ELIXIR_APP_NAME} status                         \n",
+                  "    cd ${APP_PATH}                                        \n",
+                  "    sudo -u deploy bin/${APP_NAME} describe               \n",
                   "}                                                         \n",
                   "                                                          \n",
                   "case \"$1\" in                                            \n",
@@ -267,10 +307,11 @@
                   "    stop)                                                 \n",
                   "       stop                                               \n",
                   "       ;;                                                 \n",
-                  "    restart)                                              \n",
+                  "    status)                                               \n",
+                  "       status                                             \n",
                   "       ;;                                                 \n",
                   "    *)                                                    \n",
-                  "       echo \"Usage: $0 {start|stop|status|restart}\"     \n",
+                  "       echo \"Usage: $0 {start|stop|status}\"             \n",
                   "esac                                                      \n",
                   "                                                          \n",
                   "exit 0                                                    \n"
@@ -295,7 +336,7 @@
         }],
         "ImageId"        : { "Ref" : "AMI" },
         "InstanceType"   : { "Ref" : "InstanceType" },
-        "SecurityGroups" : [ {"Ref" : "ErlangServerSecurityGroup"} ],
+        "SecurityGroups" : [ {"Ref" : "WebServerSecurityGroup"} ],
         "KeyName"        : { "Ref" : "KeyName" },
         "IamInstanceProfile": { "Ref": "Ec2InstanceProfile" },
         "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
@@ -330,10 +371,10 @@
       "DependsOn": [ "CaloriAppPolicy" ]
     },
 
-    "ErlangServerSecurityGroup" : {
+    "WebServerSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
-        "GroupDescription" : "Enable HTTP via port 80 and ssh by 22",
+        "GroupDescription" : "Enable HTTP access via port 80 and SSH access",
         "SecurityGroupIngress" : [
           {"IpProtocol" : "tcp", "FromPort" : "80",   "ToPort" : "80",   "CidrIp" : "0.0.0.0/0"},
           {"IpProtocol" : "tcp", "FromPort" : "22",   "ToPort" : "22",   "CidrIp" : { "Ref" : "SSHLocation"}}
@@ -341,9 +382,32 @@
       }
     },
 
+    "DBInstance" : {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": {
+        "DBName"            : { "Ref" : "DatabaseName" },
+        "Engine"            : "postgres",
+        "EngineVersion"     : "12.6",
+        "MasterUsername"    : { "Ref" : "DatabaseUser" },
+        "DBInstanceClass"   : { "Ref" : "DatabaseClass" },
+        "DBSecurityGroups"  : [ { "Ref" : "DBSecurityGroup" } ],
+        "AllocatedStorage"  : { "Ref" : "DatabaseAllocatedStorage" },
+        "MasterUserPassword": { "Ref" : "DatabasePass" }
+      }
+    },
+   
+    "DBSecurityGroup": {
+      "Type": "AWS::RDS::DBSecurityGroup",
+      "Properties": {
+        "DBSecurityGroupIngress": { "EC2SecurityGroupName": { "Ref": "WebServerSecurityGroup" } },
+        "GroupDescription"      : "Frontend Access"
+      }
+    },
+
     "S3Bucket": {
       "Type": "AWS::S3::Bucket",
       "DeletionPolicy": "Retain",
+      "Condition": "CreateS3Bucket",
       "Properties": {
         "BucketName": { "Ref": "CaloriAppS3Bucket" }
       }
@@ -431,6 +495,19 @@
     "WebsiteURL" : {
       "Description" : "URL for newly created Elixir Server stack",
       "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : [ "CaloriAppServerInstance", "PublicDnsName" ]}]] }
+    },
+    "DbConnectionString": {
+      "Description" : "DATABASE_URL for github secrets in production server",
+      "Value" : { "Fn::Join": [ "", [ "postgresql://USER:PASS@",
+                                      { "Fn::GetAtt": [ "DBInstance", "Endpoint.Address" ] },
+                                      ":",
+                                      { "Fn::GetAtt": [ "DBInstance", "Endpoint.Port" ] },
+                                      "/",
+                                      { "Ref": "DatabaseName" }]]}
+    },
+    "BucketString": {
+      "Description" : "AWS_S3_BUCKET for github secrets in production server",
+      "Value" : { "Ref": "CaloriAppS3Bucket" }
     }
   }
 }

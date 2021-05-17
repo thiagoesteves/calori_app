@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Staging environment and deployment
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
