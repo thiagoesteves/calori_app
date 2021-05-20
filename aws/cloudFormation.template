@@ -111,32 +111,17 @@
       "Default": "4000"
     },
 
-    "ShouldCreateBucketInputParameter": {
-      "Type": "String",
-      "Default" : "true",
-      "AllowedValues": [
-        "true",
-        "false"
-      ],
-      "Description": "If true then the S3 bucket will be created with the CloudFormation stack."
-    },
-
     "UpgradeRequestTime": {
       "Description": "Time between requests for deploy and upgrade in seconds",
       "Type": "Number",
       "Default": "30"
-    }
-  },
+    },
 
-  "Conditions": {
-    "CreateS3Bucket": {
-      "Fn::Equals": [
-        {
-          "Ref": "ShouldCreateBucketInputParameter"
-        },
-        "true"
-      ]
-    }
+    "OperatorEmail": {
+      "Description": "Email address to notify if there are any scaling operations",
+      "Type": "String",
+      "Default": "calori@gmail.com"
+   }    
   },
 
   "Resources" : {
@@ -154,6 +139,20 @@
               }
             },
             "files" : {
+              "/home/ubuntu/config.json": {
+                "content": { "Fn::Join": [ "", [
+                  "{ \"agent\": { \"run_as_user\": \"root\" },                            \n",
+                  "  \"logs\": { \"logs_collected\": { \"files\": { \"collect_list\": [ { \n",
+                  "    \"file_path\": \"/var/log/calori_app/messages\",                   \n",
+                  "    \"log_group_name\": \"", {"Ref": "WebServerLogGroup"},"\",         \n",
+                  "    \"log_stream_name\": \"{instance_id}\"                             \n",
+                  "}]}}}}                                                                 \n"
+                ]]},
+                "mode": "000400",
+                "owner": "root",
+                "group": "root"
+              },
+
               "/home/ubuntu/install.sh" : {
                 "content" : { "Fn::Join" : [ "", [
                   "#!/bin/bash                                                                        \n",
@@ -162,7 +161,7 @@
                   "DEPLOY_APP=${DEPLOY_PATH}/app                                                      \n",
                   "DEPLOY_SCRIPTS=${DEPLOY_PATH}/scripts                                              \n",
                   "LOG_PATH=/var/log/",{ "Ref": "ElixirAppName" }, "                                  \n",
-                  "LOG_FILE=info.log                                                                  \n",
+                  "LOG_FILE=messages                                                                  \n",
                   "echo \"======== Modifying nginx configuration file \"                              \n",
                   "sudo sed -i '0,/try_files $uri $uri\\/ =404;/s//proxy_set_header   X-Forwarded-For $remote_addr; \\n                proxy_set_header   Host $http_host;\\n                proxy_pass         \\\"http:\\/\\/127.0.0.1:", { "Ref": "PhoenixPort" }, "\\\";/' /etc/nginx/sites-enabled/default \n",
                   "                                                                                   \n",
@@ -173,6 +172,10 @@
                   "sudo cp /home/ubuntu/upgrade.sh /home/ubuntu/deploy.sh ${DEPLOY_SCRIPTS}           \n",
                   "sudo chown -R deploy:deploy  ${DEPLOY_PATH}/*                                      \n",
                   "sudo chown -R deploy:deploy  ${LOG_PATH}/*                                         \n",
+                  "                                                                                   \n",
+                  "echo \"======== Install Cloud Watch Agent \"                                       \n",
+                  "wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb \n",
+                  "sudo dpkg -i -E ./amazon-cloudwatch-agent.deb                                      \n",
                   "                                                                                   \n",
                   "echo \"======== Configuring to Start automatically \"                              \n",
                   "sudo systemctl enable run-app                                                      \n",
@@ -277,6 +280,7 @@
                   "                                                          \n",
                   "start() {                                                 \n",
                   "    cd ${APP_PATH}                                        \n",
+                  "    sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ubuntu/config.json -s \n",
                   "    if [ -f \"bin/${APP_NAME}\" ]; then                   \n",
                   "      echo \"starting ${APP_NAME}\"                       \n",
                   "      sudo -u deploy bin/${APP_NAME} start                \n",
@@ -339,42 +343,31 @@
         }],
         "ImageId"        : { "Ref" : "AMI" },
         "InstanceType"   : { "Ref" : "InstanceType" },
-        "SecurityGroups" : [ {"Ref" : "WebServerSecurityGroup"} ],
+        "SecurityGroups" : [ {"Ref" : "CaloriWebServerSecurityGroup"} ],
         "KeyName"        : { "Ref" : "KeyName" },
         "IamInstanceProfile": { "Ref": "Ec2InstanceProfile" },
         "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
-           "#!/bin/bash -xe\n",
-           "sudo apt-get update                                             \n",
-           "sudo apt-get install -y python-setuptools                       \n",
-           "sudo mkdir -p /opt/aws/bin                                      \n",
+           "#!/bin/bash -xe                                                                            \n",
+           "sudo apt-get update                                                                        \n",
+           "sudo apt-get install -y python-setuptools                                                  \n",
+           "sudo mkdir -p /opt/aws/bin                                                                 \n",
+
+           "# Get the Cfn-Bootstrap                                                                    \n",
            "wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz  \n",
            "sudo python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz \n",
-           "/opt/aws/bin/cfn-init -v --resource CaloriAppServerInstance",
-           " --stack ",
-           {
-             "Ref": "AWS::StackName"
-           },
-           " --region ",
-           {
-             "Ref": "AWS::Region"
-           },
-           "\n",
-           "/opt/aws/bin/cfn-signal -e $? –resource CaloriAppServerInstance",
-           " --stack ",
-           {
-             "Ref": "AWS::StackName"
-           },
-           " --region ",
-           {
-             "Ref": "AWS::Region"
-           },
-           "                                                                 \n"
+
+           "# Start cfn-init                                                                           \n",
+           "/opt/aws/bin/cfn-init -v --resource CaloriAppServerInstance", " --stack ", { "Ref": "AWS::StackName" }, " --region ", { "Ref": "AWS::Region" },
+           " || error_exit 'Failed to run cfn-init'\n",
+           
+           "# All done so signal success                                                               \n",
+           "/opt/aws/bin/cfn-signal -e $? –resource CaloriAppServerInstance", " --stack ", { "Ref": "AWS::StackName" }, " --region ", { "Ref": "AWS::Region" },"\n"
         ]]}}
       },
       "DependsOn": [ "CaloriAppPolicy" ]
     },
 
-    "WebServerSecurityGroup" : {
+    "CaloriWebServerSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
         "GroupDescription" : "Enable HTTP access via port 80 and SSH access",
@@ -402,7 +395,7 @@
     "DBSecurityGroup": {
       "Type": "AWS::RDS::DBSecurityGroup",
       "Properties": {
-        "DBSecurityGroupIngress": { "EC2SecurityGroupName": { "Ref": "WebServerSecurityGroup" } },
+        "DBSecurityGroupIngress": { "EC2SecurityGroupName": { "Ref": "CaloriWebServerSecurityGroup" } },
         "GroupDescription"      : "Frontend Access"
       }
     },
@@ -410,7 +403,6 @@
     "S3Bucket": {
       "Type": "AWS::S3::Bucket",
       "DeletionPolicy": "Retain",
-      "Condition": "CreateS3Bucket",
       "Properties": {
         "BucketName": { "Ref": "CaloriAppS3Bucket" }
       }
@@ -427,27 +419,39 @@
       "Type": "AWS::IAM::User",
       "Properties": {
           "UserName": { "Ref": "S3UserName" },
-          "Groups": [
-            {
-              "Ref": "CaloriAppGroup"
-            }
-          ]
+          "Groups": [ { "Ref": "CaloriAppGroup" } ]
       }
     },
-    
-    "FullS3AccessFromS2Role": {
+
+    "CloudWatchLogRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
-         "AssumeRolePolicyDocument": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {
+              "Service": ["ec2.amazonaws.com"]
+            },
+            "Action": ["sts:AssumeRole"]
+          }]
+        },
+        "Path": "/",
+        "Policies": [ {
+          "PolicyName": "CloudWatchLogRole",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
             "Statement": [{
-               "Effect": "Allow",
-               "Principal": {
-                  "Service": ["ec2.amazonaws.com"]
-               },
-               "Action": ["sts:AssumeRole"]
+              "Effect": "Allow",
+              "Action": [
+                "logs:Create*",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams"
+              ],     
+              "Resource": [ "arn:aws:logs:*:*:*" ]
             }]
-         },
-         "Path": "/"
+          }
+        }]
       }
     },
 
@@ -455,9 +459,16 @@
       "Type": "AWS::IAM::InstanceProfile",
       "Properties": {
         "Path": "/",
-        "Roles": [{ "Ref": "FullS3AccessFromS2Role" }]
+        "Roles": [{ "Ref": "CloudWatchLogRole" }]
       },
-      "DependsOn": [ "FullS3AccessFromS2Role" ]
+      "DependsOn": [ "CloudWatchLogRole" ]
+    },
+
+    "WebServerLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      }
     },
   
     "CaloriAppPolicy": {
@@ -483,14 +494,52 @@
             }
           ]
         },
-        "Roles": [{ "Ref": "FullS3AccessFromS2Role" }],
+        "Roles": [{ "Ref": "CloudWatchLogRole" }],
         "Groups": [
           {
             "Ref": "CaloriAppGroup"
           }
         ]
       },
-      "DependsOn": [ "CaloriAppUser", "FullS3AccessFromS2Role" ]
+      "DependsOn": [ "CaloriAppUser", "CloudWatchLogRole" ]
+    },
+
+    "BytesTransferredMetricFilter": {
+      "Type": "AWS::Logs::MetricFilter",
+      "Properties": {
+        "LogGroupName": { "Ref": "WebServerLogGroup" },
+        "FilterPattern": "[ip, identity, user_id, timestamp, request, status_code, size, ...]",
+        "MetricTransformations": [{
+          "MetricValue": "$size",
+          "MetricNamespace": "test/BytesTransferred",
+          "MetricName": "testBytesTransferred"
+        }]
+      }
+    },
+
+    "BandwidthAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "The average volume of traffic is greater 3500 KB over 10 minutes",
+        "MetricName": "testBytesTransferred",
+        "Namespace": "test/BytesTransferred",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "3500",
+        "AlarmActions": [ { "Ref": "AlarmNotificationTopic" } ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+
+    "AlarmNotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [{
+          "Endpoint": { "Ref": "OperatorEmail" },
+          "Protocol": "email"
+        }]
+      }
     }
   },
 

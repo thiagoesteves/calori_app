@@ -28,7 +28,7 @@ config :logger,
   backends: [{LoggerFileBackend, :application_log}]
 
 config :logger, :application_log,
-  path: "/var/log/calori_app/info.log",
+  path: "/var/log/calori_app/messages",
   level: :info,
   format: "[$date] [$time] [$level] $message\n"
 
