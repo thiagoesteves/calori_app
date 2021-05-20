@@ -29,7 +29,7 @@ config :logger,
 
 config :logger, :application_log,
   path: "/var/log/calori_app/info.log",
-  level: :debug, # change to info
+  level: :info,
   format: "[$date] [$time] [$level] $message\n"
 
 
