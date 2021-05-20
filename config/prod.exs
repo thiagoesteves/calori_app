@@ -24,7 +24,14 @@ config :calori_app, CaloriAppWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
 # Do not print debug messages in production
-config :logger, level: :info
+config :logger,
+  backends: [{LoggerFileBackend, :application_log}]
+
+config :logger, :application_log,
+  path: "/var/log/calori_app/info.log",
+  level: :debug, # change to info
+  format: "[$date] [$time] [$level] $message\n"
+
 
 # ## SSL Support
 #

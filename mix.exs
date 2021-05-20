@@ -4,7 +4,7 @@ defmodule CaloriApp.MixProject do
   def project do
     [
       app: :calori_app,
-      version: "0.6.0",
+      version: "0.7.0",
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
@@ -47,6 +47,7 @@ defmodule CaloriApp.MixProject do
       {:plug_cowboy, "~> 2.0"},
       {:pow, "~> 1.0"},
       {:distillery, "~> 2.1"},
+      {:logger_file_backend, "~> 0.0.10"},
 
       # For test only
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false}
