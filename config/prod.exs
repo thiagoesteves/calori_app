@@ -32,7 +32,6 @@ config :logger, :application_log,
   level: :info,
   format: "[$date] [$time] [$level] $message\n"
 
-
 # ## SSL Support
 #
 # To get SSL working, you will need to add the `https` key

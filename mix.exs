@@ -4,7 +4,7 @@ defmodule CaloriApp.MixProject do
   def project do
     [
       app: :calori_app,
-      version: "0.10.0",
+      version: "0.11.0",
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
