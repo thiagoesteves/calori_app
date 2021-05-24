@@ -1,10 +1,6 @@
 name: Elixir Develop
 
 on:
-  push:
-    branches:
-      - '*'
-      - '!main'
   pull_request:
     branches:
       - '*'
@@ -14,8 +10,6 @@ jobs:
   build:
     name: Build and test
     runs-on: ubuntu-20.04
-    env:
-      MIX_ENV: test
     services:
       postgres:
         image: postgres:12-alpine
