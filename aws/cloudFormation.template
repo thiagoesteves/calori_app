@@ -216,7 +216,7 @@
                   "  aws s3 sync s3://${UPGRADE_PATH} releases/                           \n",
                   "                                                                       \n",
                   "  # Capture current app version                                        \n",
-                  "  CURRENT_VERSION=`sudo bin/${ELIXIR_APP_NAME} describe | grep Version | sed 's/[Version: \",|[:space:]]//g'` \n",
+                  "  CURRENT_VERSION=`bin/${ELIXIR_APP_NAME} describe | grep Version | sed 's/[Version: \",|[:space:]]//g'` \n",
                   "  # Capture the newest upgrade version                                 \n",
                   "  UPGRADE_VERSION=$(find ${EC2_TMP} -type d -name '[0-9]*.[0-9]*.[0-9]*' -printf \"%f\\n\" | sort -V | tail -n 1)\n",
                   "  if [[ ${CURRENT_VERSION} != ${UPGRADE_VERSION} ]]                    \n",
